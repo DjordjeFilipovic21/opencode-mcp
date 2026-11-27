@@ -298,7 +298,7 @@ export function createExecutionHandlers(client: OpenCodeClient, defaultModel?: s
         let content = result.content;
         let messageError: string | undefined;
 
-        if (!params.noReply && result.messageId) {
+        if (!params.noReply && result.status === 'completed' && result.messageId) {
           const waited = await waitForMessageContent(client, session.id, result.messageId);
           if (waited.content) {
             content = waited.content;
@@ -310,6 +310,7 @@ export function createExecutionHandlers(client: OpenCodeClient, defaultModel?: s
           content: [{ type: 'text' as const, text: JSON.stringify({
             sessionId: result.sessionId,
             messageId: result.messageId,
+            status: result.status,
             content,
             error: messageError,
             workingDirectory: workingDir.directory,
@@ -377,7 +378,7 @@ export function createExecutionHandlers(client: OpenCodeClient, defaultModel?: s
         let content = result.content;
         let messageError: string | undefined;
 
-        if (!params.noReply && result.messageId) {
+        if (!params.noReply && result.status === 'completed' && result.messageId) {
           const waited = await waitForMessageContent(client, params.sessionId, result.messageId);
           if (waited.content) {
             content = waited.content;

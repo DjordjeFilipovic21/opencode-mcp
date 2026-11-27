@@ -128,6 +128,7 @@ export function createAgentHandlers(client: OpenCodeClient, defaultModel?: strin
           agent: params.agent,
           sessionId: result.sessionId,
           messageId: result.messageId,
+          status: result.status,
           content: result.content,
         };
 

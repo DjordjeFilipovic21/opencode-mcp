@@ -58,7 +58,7 @@ export interface OpenCodeClient {
   listChildren(sessionId: string): Promise<unknown[]>;
   abortSession(id: string): Promise<boolean>;
   shareSession(id: string): Promise<{ id: string; shareUrl?: string }>;
-  prompt(sessionId: string, promptText: string, options?: PromptOptions): Promise<{ sessionId: string; messageId: string; content: string }>;
+  prompt(sessionId: string, promptText: string, options?: PromptOptions): Promise<{ sessionId: string; messageId: string; content: string; status: 'completed' | 'running' }>;
   listAgents(): Promise<unknown[]>;
   listProviders(): Promise<{ providers: unknown[]; defaults: Record<string, string> }>;
   updateConfig(config: Record<string, unknown>): Promise<unknown>;
@@ -178,7 +178,7 @@ export async function createClient(config: ServerConfig): Promise<OpenCodeClient
     content?: Array<{ type: string; text?: string }>;
   }
 
-  async function waitForIdle(sessionId: string, since: number): Promise<V2Message[]> {
+  async function waitForIdle(sessionId: string, since: number): Promise<{ messages: V2Message[]; completed: boolean }> {
     const deadline = Date.now() + timeout;
     for (;;) {
       await sleep(2000);
@@ -186,17 +186,16 @@ export async function createClient(config: ServerConfig): Promise<OpenCodeClient
         'GET',
         `/session/${encodeURIComponent(sessionId)}/message?limit=30`
       );
-      const idle = Array.isArray(messages)
-        ? messages.find((m) => m.type === 'idle' && m.time.created >= since)
-        : undefined;
+      const list = Array.isArray(messages) ? messages : [];
+      const idle = list.find((m) => m.type === 'idle' && m.time.created >= since);
       if (idle) {
-        return Array.isArray(messages) ? messages : [];
+        return { messages: list, completed: true };
       }
       if (Date.now() >= deadline) {
-        throw new OpenCodeMCPError(
-          `Prompt timed out after ${timeout}ms (session ${sessionId}) — poll opencode_session_list / message API for the result`,
-          ErrorCodes.TIMEOUT
-        );
+        // Don't throw: the turn keeps running server-side. Report it as
+        // running so the orchestrator polls instead of re-dispatching.
+        console.error(`[waitForIdle] Poll timed out after ${timeout}ms (session ${sessionId}) — still running server-side`);
+        return { messages: list, completed: false };
       }
     }
   }
@@ -362,7 +361,7 @@ export async function createClient(config: ServerConfig): Promise<OpenCodeClient
     sessionId: string,
     promptText: string,
     options?: PromptOptions
-  ): Promise<{ sessionId: string; messageId: string; content: string }> {
+  ): Promise<{ sessionId: string; messageId: string; content: string; status: 'completed' | 'running' }> {
     await ensureConnected();
 
     // v2 API: POST /session/{id}/prompt with {text} (SDK's /message POST 404s on v2).
@@ -380,10 +379,18 @@ export async function createClient(config: ServerConfig): Promise<OpenCodeClient
     );
 
     if (options?.noReply) {
-      return { sessionId, messageId: posted?.id ?? '', content: '' };
+      return { sessionId, messageId: posted?.id ?? '', content: '', status: 'completed' };
     }
 
-    const messages = await waitForIdle(sessionId, since);
+    const { messages, completed } = await waitForIdle(sessionId, since);
+    if (!completed) {
+      return {
+        sessionId,
+        messageId: posted?.id ?? '',
+        content: `Turn still running after ${timeout}ms. Poll with opencode_session_prompt ("what is the status?") or opencode_session_children on this sessionId — do NOT re-dispatch.`,
+        status: 'running',
+      };
+    }
     const idleCreated = Math.max(
       ...messages
         .filter((m) => m.type === 'idle' && m.time.created >= since)
@@ -395,6 +402,7 @@ export async function createClient(config: ServerConfig): Promise<OpenCodeClient
       sessionId,
       messageId: id || posted?.id || '',
       content: text,
+      status: 'completed',
     };
   }
 

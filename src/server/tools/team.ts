@@ -134,6 +134,7 @@ export function createTeamHandlers(client: OpenCodeClient, defaultModel?: string
             parentCreated: created,
             parentAgent: leadAgent,
             messageId: result.messageId,
+            status: result.status,
             subtasks: params.subtasks.length,
             summary: result.content,
             workingDirectory: workingDir.directory,

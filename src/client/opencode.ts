@@ -55,6 +55,7 @@ export interface OpenCodeClient {
   createSession(title?: string, model?: { providerID: string; modelID: string }, directory?: string): Promise<{ id: string; title?: string; directory?: string }>;
   getSession(id: string): Promise<unknown>;
   getSessionMessage(sessionId: string, messageId: string): Promise<{ info?: unknown; parts?: unknown[] }>;
+  listChildren(sessionId: string): Promise<unknown[]>;
   abortSession(id: string): Promise<boolean>;
   shareSession(id: string): Promise<{ id: string; shareUrl?: string }>;
   prompt(sessionId: string, promptText: string, options?: PromptOptions): Promise<{ sessionId: string; messageId: string; content: string }>;
@@ -523,6 +524,19 @@ export async function createClient(config: ServerConfig): Promise<OpenCodeClient
     return result.data ?? [];
   }
 
+  async function listChildren(sessionId: string): Promise<unknown[]> {
+    await ensureConnected();
+    // v2 has no /session/{id}/children endpoint — children carry parentID on the session
+    const sessions = await withTimeout(
+      () => api<unknown[]>('GET', '/session'),
+      'List children'
+    );
+    const list = Array.isArray(sessions) ? sessions : [];
+    return list.filter(
+      (s) => s !== null && typeof s === 'object' && (s as Record<string, unknown>).parentID === sessionId
+    );
+  }
+
   function disconnect(): void {
     connected = false;
   }
@@ -544,6 +558,7 @@ export async function createClient(config: ServerConfig): Promise<OpenCodeClient
     searchText,
     findFiles,
     findSymbols,
+    listChildren,
     disconnect,
   };
 }

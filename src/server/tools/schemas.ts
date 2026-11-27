@@ -129,6 +129,10 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
   opencode_agent_list: ANNOTATIONS.readOnlyExternal,
   opencode_agent_delegate: ANNOTATIONS.writeExternal,
 
+  // Team tools - parent session orchestration with native task subagents
+  opencode_team: ANNOTATIONS.writeExternal,
+  opencode_session_children: ANNOTATIONS.readOnlyExternal,
+
   // Skill tools
   opencode_skill_list: ANNOTATIONS.readOnlyExternal,
   opencode_skill_create: ANNOTATIONS.create,

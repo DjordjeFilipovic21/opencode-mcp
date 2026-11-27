@@ -54,7 +54,7 @@ async function findProjectRoot(startDir: string): Promise<string | null> {
  * Get the working directory to use
  * Priority: explicit param > env var > project root detection > fallback
  */
-async function getWorkingDirectory(explicitDir?: string): Promise<{ directory: string; source: string }> {
+export async function getWorkingDirectory(explicitDir?: string): Promise<{ directory: string; source: string }> {
   // If explicitly provided, use it
   if (explicitDir) {
     try {

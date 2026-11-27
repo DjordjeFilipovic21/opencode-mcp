@@ -14,6 +14,7 @@ import { getExecutionToolDefinitions } from './execution.js';
 import { getFileToolDefinitions } from './files.js';
 import { getConfigToolDefinitions } from './config.js';
 import { getAgentToolDefinitions } from './agents.js';
+import { getTeamToolDefinitions } from './team.js';
 import { getSkillToolDefinitions } from './skills.js';
 import { getMcpToolDefinitions } from './mcp.js';
 import { getToolConfigToolDefinitions } from './tool-config.js';
@@ -31,6 +32,7 @@ export {
   getFileToolDefinitions, 
   getConfigToolDefinitions, 
   getAgentToolDefinitions,
+  getTeamToolDefinitions,
   getSkillToolDefinitions,
   getMcpToolDefinitions,
   getToolConfigToolDefinitions,
@@ -72,6 +74,7 @@ export function getAllToolDefinitions(): ToolDefinition[] {
     ...getFileToolDefinitions(),
     ...getConfigToolDefinitions(),
     ...getAgentToolDefinitions(),
+    ...getTeamToolDefinitions(),
     ...getSkillToolDefinitions(),
     ...getMcpToolDefinitions(),
     ...getToolConfigToolDefinitions(),
@@ -120,6 +123,7 @@ export interface AllHandlers {
   files: ReturnType<typeof import('./files.js').createFileHandlers>;
   config: ReturnType<typeof import('./config.js').createConfigHandlers>;
   agents: ReturnType<typeof import('./agents.js').createAgentHandlers>;
+  team: ReturnType<typeof import('./team.js').createTeamHandlers>;
   skills: ReturnType<typeof import('./skills.js').createSkillHandlers>;
   mcp: ReturnType<typeof import('./mcp.js').createMcpHandlers>;
   toolConfig: ReturnType<typeof import('./tool-config.js').createToolConfigHandlers>;
@@ -180,6 +184,13 @@ export async function registerAllTools(
   
   s.tool('opencode_agent_list', 'List all available agents (primary and subagents). Primary agents are used for main conversations, subagents are specialized assistants that can be invoked for specific tasks.', agentSchemas.AgentListInputSchema, TOOL_ANNOTATIONS.opencode_agent_list, agentHandlers.opencode_agent_list);
   s.tool('opencode_agent_delegate', 'Delegate a task to a specific agent. Use to invoke specialized agents like "plan" for analysis without changes, "explore" for fast codebase exploration, or custom agents for specific workflows.', agentSchemas.AgentDelegateInputSchema, TOOL_ANNOTATIONS.opencode_agent_delegate, agentHandlers.opencode_agent_delegate);
+
+  // Register team tools (2 tools: parent-session orchestration + children listing)
+  const { createTeamHandlers: createTeam, INPUT_SCHEMAS: teamSchemas } = await import('./team.js');
+  const teamHandlers = createTeam(client, defaultModel);
+
+  s.tool('opencode_team', 'Run parallel work through a parent OpenCode session that spawns native task subagents sharing its context. Returns a consolidated summary.', teamSchemas.TeamInputSchema, TOOL_ANNOTATIONS.opencode_team, teamHandlers.opencode_team);
+  s.tool('opencode_session_children', 'List child task sessions spawned by a parent session.', teamSchemas.SessionIdInputSchema, TOOL_ANNOTATIONS.opencode_session_children, teamHandlers.opencode_session_children);
 
   // Register skill tools (2 tools)
   const { createSkillHandlers: createSkill, INPUT_SCHEMAS: skillSchemas } = await import('./skills.js');
